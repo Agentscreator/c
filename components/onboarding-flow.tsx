@@ -26,26 +26,56 @@ import Image from "next/image"
 interface OnboardingFlowProps {
   currentStep: number
   setCurrentStep: (step: number) => void
-  onComplete: () => void
+  onComplete: (onboardingData: {
+    tagCode?: string
+    skillLevel?: string
+    location?: string
+    interests: string[]
+    agreedToTerms: boolean
+    allowLocation: boolean
+  }) => void
+  onBack: () => void // Added this missing prop
+  userInfo: {
+    username: string
+    email: string
+    phone: string
+  }
+  isLoading?: boolean
+  error?: string
 }
 
-export function OnboardingFlow({ currentStep, setCurrentStep, onComplete }: OnboardingFlowProps) {
+export function OnboardingFlow({ 
+  currentStep, 
+  setCurrentStep, 
+  onComplete, 
+  onBack, // Added this parameter
+  userInfo, 
+  isLoading = false, 
+  error = "" 
+}: OnboardingFlowProps) {
   const [formData, setFormData] = useState({
-    username: "",
-    email: "",
-    phone: "",
-    password: "",
-    showPassword: false,
+    tagCode: "",
     skillLevel: "",
     location: "",
     interests: [] as string[],
+    agreedToTerms: false,
+    allowLocation: false,
+    showPassword: false,
   })
 
   const nextStep = () => {
     if (currentStep < 6) {
       setCurrentStep(currentStep + 1)
     } else {
-      onComplete()
+      // Complete onboarding and pass data back
+      onComplete({
+        tagCode: formData.tagCode,
+        skillLevel: formData.skillLevel,
+        location: formData.location,
+        interests: formData.interests,
+        agreedToTerms: formData.agreedToTerms,
+        allowLocation: formData.allowLocation,
+      })
     }
   }
 
@@ -110,6 +140,17 @@ export function OnboardingFlow({ currentStep, setCurrentStep, onComplete }: Onbo
                   Enter Tag Code Manually
                 </Button>
               </div>
+
+              {/* Manual tag code input */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-300">Or enter tag code:</label>
+                <Input
+                  placeholder="Enter your tag code"
+                  value={formData.tagCode}
+                  onChange={(e) => setFormData({ ...formData, tagCode: e.target.value })}
+                  className="bg-[#404040] border-gray-500 text-white placeholder-gray-500 rounded-2xl py-3"
+                />
+              </div>
             </div>
           </div>
         )
@@ -129,61 +170,52 @@ export function OnboardingFlow({ currentStep, setCurrentStep, onComplete }: Onbo
               </div>
 
               <div className="text-center space-y-2">
-                <h1 className="text-xl sm:text-2xl font-bold text-white">Create Your Callsign</h1>
+                <h1 className="text-xl sm:text-2xl font-bold text-white">Welcome, {userInfo.username}!</h1>
                 <p className="text-gray-400 text-sm sm:text-base">Join 1,247 players nationwide</p>
               </div>
 
               <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-300 mb-2 block">Gaming Username (Callsign)</label>
-                  <Input
-                    placeholder="ShadowSniper"
-                    value={formData.username}
-                    onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                    className="bg-[#404040] border-gray-500 text-white placeholder-gray-500 rounded-2xl py-3"
-                  />
-                  {formData.username && <p className="text-xs text-[#00FF41] mt-1">✓ Username available</p>}
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-gray-300 mb-2 block">Phone Number</label>
-                  <Input
-                    placeholder="+1 (555) 123-4567"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="bg-[#404040] border-gray-500 text-white placeholder-gray-500 rounded-2xl py-3"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-gray-300 mb-2 block">Email</label>
-                  <Input
-                    type="email"
-                    placeholder="player@example.com"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="bg-[#404040] border-gray-500 text-white placeholder-gray-500 rounded-2xl py-3"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-gray-300 mb-2 block">Password</label>
-                  <div className="relative">
-                    <Input
-                      type={formData.showPassword ? "text" : "password"}
-                      placeholder="Create secure password"
-                      value={formData.password}
-                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      className="bg-[#404040] border-gray-500 text-white placeholder-gray-500 rounded-2xl py-3 pr-12"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, showPassword: !formData.showPassword })}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
-                    >
-                      {formData.showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
+                <div className="bg-[#404040] rounded-2xl p-4">
+                  <h3 className="font-semibold mb-2">Your Account Details</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Username:</span>
+                      <span className="text-white">{userInfo.username}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Email:</span>
+                      <span className="text-white">{userInfo.email}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Phone:</span>
+                      <span className="text-white">{userInfo.phone}</span>
+                    </div>
                   </div>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-300 mb-2 block">Skill Level</label>
+                  <select
+                    value={formData.skillLevel}
+                    onChange={(e) => setFormData({ ...formData, skillLevel: e.target.value })}
+                    className="w-full bg-[#404040] border border-gray-500 text-white rounded-2xl py-3 px-4"
+                  >
+                    <option value="">Select your skill level</option>
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="advanced">Advanced</option>
+                    <option value="expert">Expert</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-300 mb-2 block">Location (City, State)</label>
+                  <Input
+                    placeholder="Los Angeles, CA"
+                    value={formData.location}
+                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                    className="bg-[#404040] border-gray-500 text-white placeholder-gray-500 rounded-2xl py-3"
+                  />
                 </div>
               </div>
 
@@ -344,9 +376,9 @@ export function OnboardingFlow({ currentStep, setCurrentStep, onComplete }: Onbo
                   <div>
                     <span className="text-gray-400">Shipping to:</span>
                     <div className="text-white mt-1">
-                      123 Main St
+                      {formData.location || "Your Address"}
                       <br />
-                      City, ST 12345
+                      (Address will be collected at checkout)
                     </div>
                   </div>
                   <div className="flex justify-between pt-2 border-t border-gray-600">
@@ -415,21 +447,40 @@ export function OnboardingFlow({ currentStep, setCurrentStep, onComplete }: Onbo
 
                 <div className="space-y-3">
                   <label className="flex items-center space-x-3">
-                    <input type="checkbox" className="w-4 h-4 text-[#00FF41] bg-[#404040] border-gray-600 rounded" />
+                    <input 
+                      type="checkbox" 
+                      checked={formData.agreedToTerms}
+                      onChange={(e) => setFormData({ ...formData, agreedToTerms: e.target.checked })}
+                      className="w-4 h-4 text-[#00FF41] bg-[#404040] border-gray-600 rounded" 
+                    />
                     <span className="text-sm">I agree to the Terms and Conditions</span>
                   </label>
                   <label className="flex items-center space-x-3">
-                    <input type="checkbox" className="w-4 h-4 text-[#00FF41] bg-[#404040] border-gray-600 rounded" />
+                    <input 
+                      type="checkbox" 
+                      checked={formData.allowLocation}
+                      onChange={(e) => setFormData({ ...formData, allowLocation: e.target.checked })}
+                      className="w-4 h-4 text-[#00FF41] bg-[#404040] border-gray-600 rounded" 
+                    />
                     <span className="text-sm">Allow location access for nearby games</span>
                   </label>
                 </div>
+
+                {error && (
+                  <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-red-400">{error}</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <Button
                 onClick={nextStep}
-                className="w-full bg-[#00FF41] text-black hover:bg-[#00FF41]/90 font-semibold rounded-2xl py-3 shadow-glow-green transition-all duration-300"
+                disabled={!formData.agreedToTerms || !formData.allowLocation || isLoading}
+                className="w-full bg-[#00FF41] text-black hover:bg-[#00FF41]/90 font-semibold rounded-2xl py-3 shadow-glow-green transition-all duration-300 disabled:opacity-50"
               >
-                Complete Setup
+                {isLoading ? "Creating Account..." : "Complete Setup"}
                 <CheckCircle className="w-4 h-4 ml-2" />
               </Button>
             </div>

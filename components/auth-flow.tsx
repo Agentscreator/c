@@ -6,72 +6,180 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
-import { ArrowLeft, Eye, EyeOff, AlertCircle, CheckCircle, User, Shield } from "lucide-react"
+import { ArrowLeft, Eye, EyeOff, AlertCircle, User, Shield } from "lucide-react"
 import Image from "next/image"
+import { OnboardingFlow } from "./onboarding-flow"
 
 interface AuthFlowProps {
-  onAuthSuccess: (userType: "player" | "referee") => void
+  onAuthSuccess: (userType: "player" | "referee", isNewSignup: boolean) => void
   onBack: () => void
 }
 
 export function AuthFlow({ onAuthSuccess, onBack }: AuthFlowProps) {
   const [isLogin, setIsLogin] = useState(true)
   const [selectedRole, setSelectedRole] = useState<"player" | "referee">("player")
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const [onboardingStep, setOnboardingStep] = useState(1)
   const [formData, setFormData] = useState({
     username: "",
     email: "",
     password: "",
     confirmPassword: "",
+    phone: "",
+    agreedToTerms: false,
+    allowLocation: false,
     showPassword: false,
     showConfirmPassword: false,
   })
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
     setIsLoading(true)
 
-    // Simulate loading
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: formData.username, // Can be username or email
+          password: formData.password,
+        }),
+      })
 
-    if (isLogin) {
-      // Fake authentication - check for specific credentials
-      if (formData.username === "1234" && formData.password === "12345678") {
-        onAuthSuccess("player")
-      } else if (formData.username === "ref1" && formData.password === "referee123") {
-        onAuthSuccess("referee")
+      const data = await response.json()
+
+      if (data.success) {
+        // On successful login, go directly to the app without onboarding
+        onAuthSuccess("player", false)
       } else {
-        setError("Invalid credentials. Try: 1234/12345678 (Player) or ref1/referee123 (Referee)")
+        setError(data.message || "Invalid credentials")
       }
-    } else {
-      // Fake signup - just validate fields
-      if (!formData.username || !formData.email || !formData.password) {
-        setError("Please fill in all fields")
-      } else if (formData.password !== formData.confirmPassword) {
-        setError("Passwords don't match")
-      } else if (formData.password.length < 8) {
-        setError("Password must be at least 8 characters")
-      } else {
-        onAuthSuccess(selectedRole)
-      }
+    } catch (err) {
+      setError("Network error. Please try again.")
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleSignupStart = (e: React.FormEvent) => {
+    e.preventDefault()
+    setError("")
+
+    // Basic validation
+    if (!formData.username || !formData.email || !formData.password || !formData.phone) {
+      setError("Please fill in all required fields")
+      return
     }
 
-    setIsLoading(false)
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords don't match")
+      return
+    }
+
+    if (formData.password.length < 8) {
+      setError("Password must be at least 8 characters")
+      return
+    }
+
+    // Only start onboarding flow for signup
+    setShowOnboarding(true)
+    setOnboardingStep(1)
+  }
+
+  const handleOnboardingComplete = async (onboardingData: any) => {
+    setIsLoading(true)
+    setError("")
+
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: formData.username,
+          email: formData.email,
+          phone: formData.phone,
+          password: formData.password,
+          tagCode: onboardingData.tagCode,
+          skillLevel: onboardingData.skillLevel,
+          location: onboardingData.location,
+          interests: onboardingData.interests,
+          agreedToTerms: onboardingData.agreedToTerms,
+          allowLocation: onboardingData.allowLocation,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        onAuthSuccess(selectedRole, true)
+      } else {
+        setError(data.message || "Registration failed")
+        setShowOnboarding(false) // Go back to signup form
+      }
+    } catch (err) {
+      setError("Network error. Please try again.")
+      setShowOnboarding(false) // Go back to signup form
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    if (isLogin) {
+      handleLogin(e)
+    } else {
+      handleSignupStart(e)
+    }
   }
 
   const toggleMode = () => {
     setIsLogin(!isLogin)
     setError("")
+    // Reset onboarding state when switching modes
+    setShowOnboarding(false)
+    setOnboardingStep(1)
     setFormData({
       username: "",
       email: "",
       password: "",
       confirmPassword: "",
+      phone: "",
+      agreedToTerms: false,
+      allowLocation: false,
       showPassword: false,
       showConfirmPassword: false,
     })
+  }
+
+  const handleOnboardingBack = () => {
+    setShowOnboarding(false)
+    setOnboardingStep(1)
+  }
+
+  // Only show onboarding flow if in signup mode AND onboarding has been started
+  if (!isLogin && showOnboarding) {
+    return (
+      <OnboardingFlow
+        currentStep={onboardingStep}
+        setCurrentStep={setOnboardingStep}
+        onComplete={handleOnboardingComplete}
+        onBack={handleOnboardingBack}
+        userInfo={{
+          username: formData.username,
+          email: formData.email,
+          phone: formData.phone,
+        }}
+        isLoading={isLoading}
+        error={error}
+      />
+    )
   }
 
   return (
@@ -141,29 +249,9 @@ export function AuthFlow({ onAuthSuccess, onBack }: AuthFlowProps) {
               </div>
             )}
 
-            {/* Demo Credentials */}
-            {isLogin && (
-              <div className="bg-[#00FF41]/10 border border-[#00FF41]/30 rounded-lg p-3">
-                <div className="flex items-center space-x-2 mb-2">
-                  <CheckCircle className="w-4 h-4 text-[#00FF41]" />
-                  <span className="text-sm font-medium text-[#00FF41]">Demo Credentials</span>
-                </div>
-                <div className="text-xs text-gray-300 space-y-1">
-                  <div>
-                    Player: <span className="text-[#00FF41] font-mono">1234</span> /{" "}
-                    <span className="text-[#00FF41] font-mono">12345678</span>
-                  </div>
-                  <div>
-                    Referee: <span className="text-[#FF6B35] font-mono">ref1</span> /{" "}
-                    <span className="text-[#FF6B35] font-mono">referee123</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Username */}
+              {/* Username/Email */}
               <div>
                 <label className="text-sm font-medium text-gray-300 mb-2 block">
                   {isLogin ? "Username or Email" : "Username"}
@@ -186,6 +274,21 @@ export function AuthFlow({ onAuthSuccess, onBack }: AuthFlowProps) {
                     placeholder="your@email.com"
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    className="bg-[#1A1A1A] border-gray-600 text-white placeholder-gray-500"
+                    required
+                  />
+                </div>
+              )}
+
+              {/* Phone (signup only) */}
+              {!isLogin && (
+                <div>
+                  <label className="text-sm font-medium text-gray-300 mb-2 block">Phone</label>
+                  <Input
+                    type="tel"
+                    placeholder="(555) 123-4567"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     className="bg-[#1A1A1A] border-gray-600 text-white placeholder-gray-500"
                     required
                   />
@@ -258,7 +361,7 @@ export function AuthFlow({ onAuthSuccess, onBack }: AuthFlowProps) {
                     : "bg-[#00FF41] hover:bg-[#00FF41]/90 text-black"
                 }`}
               >
-                {isLoading ? "Please wait..." : isLogin ? "Sign In" : "Create Account"}
+                {isLoading ? "Please wait..." : isLogin ? "Sign In" : "Continue to Setup"}
               </Button>
             </form>
 
@@ -267,7 +370,7 @@ export function AuthFlow({ onAuthSuccess, onBack }: AuthFlowProps) {
               <button
                 type="button"
                 onClick={toggleMode}
-                className="text-sm text-gray-400 hover:text-[#00FF41] transition-colors"
+                className="text-sm text-white hover:text-[#00FF41] transition-colors font-medium"
               >
                 {isLogin ? "Don't have an account? Sign up" : "Already have an account? Sign in"}
               </button>

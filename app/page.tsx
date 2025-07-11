@@ -33,22 +33,22 @@ export default function HomePage() {
     setAppState("auth")
   }
 
-  const handleAuthSuccess = async (type: UserType) => {
+  const handleAuthSuccess = async (type: UserType, isNewSignup: boolean) => {
     setIsLoading(true)
     setIsAuthenticated(true)
     setUserType(type)
     localStorage.setItem("crosspointx-auth", "authenticated")
     localStorage.setItem("crosspointx-user-type", type)
 
-    // Small delay for smooth transition
     await new Promise((resolve) => setTimeout(resolve, 500))
 
-    // Referees skip onboarding and go straight to their dashboard
     if (type === "referee") {
       setAppState("app")
-    } else {
+    } else if (isNewSignup) {
       setAppState("onboarding")
-      setCurrentStep(1) // Ensure we start at step 1
+      setCurrentStep(1)
+    } else {
+      setAppState("app")
     }
     setIsLoading(false)
   }
