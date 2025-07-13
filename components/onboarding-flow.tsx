@@ -20,6 +20,9 @@ import {
   CreditCard,
   DollarSign,
   Package,
+  Plus,
+  X,
+  Lock,
 } from "lucide-react"
 import Image from "next/image"
 
@@ -33,12 +36,13 @@ interface OnboardingFlowProps {
     interests: string[]
     agreedToTerms: boolean
     allowLocation: boolean
+    paymentMethodAdded?: boolean
   }) => void
-  onBack: () => void // Added this missing prop
-  userInfo: {
-    username: string
-    email: string
-    phone: string
+  onBack: () => void
+  userInfo?: {
+    username?: string
+    email?: string
+    phone?: string
   }
   isLoading?: boolean
   error?: string
@@ -48,8 +52,8 @@ export function OnboardingFlow({
   currentStep, 
   setCurrentStep, 
   onComplete, 
-  onBack, // Added this parameter
-  userInfo, 
+  onBack,
+  userInfo = {}, 
   isLoading = false, 
   error = "" 
 }: OnboardingFlowProps) {
@@ -61,7 +65,24 @@ export function OnboardingFlow({
     agreedToTerms: false,
     allowLocation: false,
     showPassword: false,
+    paymentMethodAdded: false,
   })
+
+  const [walletStep, setWalletStep] = useState<'main' | 'add-payment' | 'processing'>('main')
+  const [cardData, setCardData] = useState({
+    cardNumber: '',
+    expiryDate: '',
+    cvv: '',
+    name: '',
+    zipCode: ''
+  })
+
+  // Provide default values for userInfo
+  const safeUserInfo = {
+    username: userInfo.username || 'Player',
+    email: userInfo.email || 'player@example.com',
+    phone: userInfo.phone || '+1 (555) 123-4567'
+  }
 
   const nextStep = () => {
     if (currentStep < 6) {
@@ -75,6 +96,7 @@ export function OnboardingFlow({
         interests: formData.interests,
         agreedToTerms: formData.agreedToTerms,
         allowLocation: formData.allowLocation,
+        paymentMethodAdded: formData.paymentMethodAdded,
       })
     }
   }
@@ -86,6 +108,43 @@ export function OnboardingFlow({
         ? prev.interests.filter((i) => i !== interest)
         : [...prev.interests, interest],
     }))
+  }
+
+  const handleAddPaymentMethod = async () => {
+    setWalletStep('processing')
+    
+    // Simulate Stripe payment method creation
+    try {
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      setFormData(prev => ({ ...prev, paymentMethodAdded: true }))
+      setWalletStep('main')
+    } catch (error) {
+      console.error('Payment method creation failed:', error)
+      setWalletStep('add-payment')
+    }
+  }
+
+  const formatCardNumber = (value: string) => {
+    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '')
+    const matches = v.match(/\d{4,16}/g)
+    const match = matches && matches[0] || ''
+    const parts = []
+    for (let i = 0, len = match.length; i < len; i += 4) {
+      parts.push(match.substring(i, i + 4))
+    }
+    if (parts.length) {
+      return parts.join(' ')
+    } else {
+      return v
+    }
+  }
+
+  const formatExpiryDate = (value: string) => {
+    const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '')
+    if (v.length >= 2) {
+      return v.substring(0, 2) + '/' + v.substring(2, 4)
+    }
+    return v
   }
 
   const renderStep = () => {
@@ -141,7 +200,6 @@ export function OnboardingFlow({
                 </Button>
               </div>
 
-              {/* Manual tag code input */}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-300">Or enter tag code:</label>
                 <Input
@@ -170,7 +228,7 @@ export function OnboardingFlow({
               </div>
 
               <div className="text-center space-y-2">
-                <h1 className="text-xl sm:text-2xl font-bold text-white">Welcome, {userInfo.username}!</h1>
+                <h1 className="text-xl sm:text-2xl font-bold text-white">Welcome, {safeUserInfo.username}!</h1>
                 <p className="text-gray-400 text-sm sm:text-base">Join 1,247 players nationwide</p>
               </div>
 
@@ -180,15 +238,15 @@ export function OnboardingFlow({
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-400">Username:</span>
-                      <span className="text-white">{userInfo.username}</span>
+                      <span className="text-white">{safeUserInfo.username}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-400">Email:</span>
-                      <span className="text-white">{userInfo.email}</span>
+                      <span className="text-white">{safeUserInfo.email}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-400">Phone:</span>
-                      <span className="text-white">{userInfo.phone}</span>
+                      <span className="text-white">{safeUserInfo.phone}</span>
                     </div>
                   </div>
                 </div>
@@ -244,43 +302,180 @@ export function OnboardingFlow({
                 </Badge>
               </div>
 
-              <div className="text-center space-y-2">
-                <h1 className="text-xl sm:text-2xl font-bold text-white">Activate Your Wallet</h1>
-                <p className="text-gray-400 text-sm sm:text-base">Secure payments for games and tournaments</p>
-              </div>
+              {walletStep === 'main' && (
+                <>
+                  <div className="text-center space-y-2">
+                    <h1 className="text-xl sm:text-2xl font-bold text-white">Activate Your Wallet</h1>
+                    <p className="text-gray-400 text-sm sm:text-base">Secure payments for games and tournaments</p>
+                  </div>
 
-              <div className="bg-gradient-to-r from-[#00FF41]/20 to-[#FF6B35]/20 border border-[#00FF41] rounded-2xl p-6 text-center">
-                <div className="w-16 h-16 bg-[#00FF41] rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <Wallet className="w-8 h-8 text-black" />
-                </div>
-                <h3 className="font-semibold text-lg mb-2">CrosspointX Wallet</h3>
-                <p className="text-gray-300 text-sm mb-4">Load funds, track earnings, and pay for games seamlessly</p>
-                <div className="text-2xl font-bold text-[#00FF41] mb-2">$0.00</div>
-                <div className="text-xs text-gray-400">Starting Balance</div>
-              </div>
+                  <div className="bg-gradient-to-r from-[#00FF41]/20 to-[#FF6B35]/20 border border-[#00FF41] rounded-2xl p-6 text-center">
+                    <div className="w-16 h-16 bg-[#00FF41] rounded-2xl flex items-center justify-center mx-auto mb-4">
+                      <Wallet className="w-8 h-8 text-black" />
+                    </div>
+                    <h3 className="font-semibold text-lg mb-2">CrosspointX Wallet</h3>
+                    <p className="text-gray-300 text-sm mb-4">Load funds, track earnings, and pay for games seamlessly</p>
+                    <div className="text-2xl font-bold text-[#00FF41] mb-2">$0.00</div>
+                    <div className="text-xs text-gray-400">Starting Balance</div>
+                  </div>
 
-              <div className="space-y-3">
-                <div className="flex items-center space-x-3 p-3 bg-[#404040] rounded-xl">
-                  <Shield className="w-5 h-5 text-[#00FF41]" />
-                  <span className="text-sm">Bank-level security encryption</span>
-                </div>
-                <div className="flex items-center space-x-3 p-3 bg-[#404040] rounded-xl">
-                  <CreditCard className="w-5 h-5 text-[#00FF41]" />
-                  <span className="text-sm">Multiple payment methods supported</span>
-                </div>
-                <div className="flex items-center space-x-3 p-3 bg-[#404040] rounded-xl">
-                  <DollarSign className="w-5 h-5 text-[#00FF41]" />
-                  <span className="text-sm">Instant transfers and withdrawals</span>
-                </div>
-              </div>
+                  {formData.paymentMethodAdded && (
+                    <div className="bg-[#404040] rounded-2xl p-4 border border-[#00FF41]/30">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-[#00FF41] rounded-lg flex items-center justify-center">
+                          <CreditCard className="w-5 h-5 text-black" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-sm font-medium">•••• •••• •••• 4242</div>
+                          <div className="text-xs text-gray-400">Expires 12/28</div>
+                        </div>
+                        <CheckCircle className="w-5 h-5 text-[#00FF41]" />
+                      </div>
+                    </div>
+                  )}
 
-              <Button
-                onClick={nextStep}
-                className="w-full bg-[#00FF41] text-black hover:bg-[#00FF41]/90 font-semibold rounded-2xl py-3 shadow-glow-green transition-all duration-300"
-              >
-                Activate Wallet
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-3 p-3 bg-[#404040] rounded-xl">
+                      <Shield className="w-5 h-5 text-[#00FF41]" />
+                      <span className="text-sm">Bank-level security encryption</span>
+                    </div>
+                    <div className="flex items-center space-x-3 p-3 bg-[#404040] rounded-xl">
+                      <Lock className="w-5 h-5 text-[#00FF41]" />
+                      <span className="text-sm">PCI DSS compliant payments</span>
+                    </div>
+                    <div className="flex items-center space-x-3 p-3 bg-[#404040] rounded-xl">
+                      <DollarSign className="w-5 h-5 text-[#00FF41]" />
+                      <span className="text-sm">Instant transfers and withdrawals</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {!formData.paymentMethodAdded && (
+                      <Button
+                        onClick={() => setWalletStep('add-payment')}
+                        className="w-full bg-[#00FF41] text-black hover:bg-[#00FF41]/90 font-semibold rounded-2xl py-3 shadow-glow-green transition-all duration-300"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Payment Method
+                      </Button>
+                    )}
+                    <Button
+                      onClick={nextStep}
+                      variant="outline"
+                      className="w-full border-gray-500 text-gray-300 bg-transparent rounded-2xl py-3 hover:bg-gray-600/20"
+                    >
+                      {formData.paymentMethodAdded ? 'Continue' : 'Skip for Now'}
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </div>
+                </>
+              )}
+
+              {walletStep === 'add-payment' && (
+                <>
+                  <div className="flex items-center justify-between">
+                    <button
+                      onClick={() => setWalletStep('main')}
+                      className="p-2 rounded-lg bg-[#404040] hover:bg-[#505050] transition-colors"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                    <h1 className="text-xl font-bold text-white">Add Payment Method</h1>
+                    <div className="w-9 h-9"></div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-sm font-medium text-gray-300 mb-2 block">Cardholder Name</label>
+                      <Input
+                        placeholder="John Doe"
+                        value={cardData.name}
+                        onChange={(e) => setCardData({ ...cardData, name: e.target.value })}
+                        className="bg-[#404040] border-gray-500 text-white placeholder-gray-500 rounded-2xl py-3"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-gray-300 mb-2 block">Card Number</label>
+                      <Input
+                        placeholder="1234 5678 9012 3456"
+                        value={cardData.cardNumber}
+                        onChange={(e) => setCardData({ ...cardData, cardNumber: formatCardNumber(e.target.value) })}
+                        maxLength={19}
+                        className="bg-[#404040] border-gray-500 text-white placeholder-gray-500 rounded-2xl py-3"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-sm font-medium text-gray-300 mb-2 block">Expiry Date</label>
+                        <Input
+                          placeholder="MM/YY"
+                          value={cardData.expiryDate}
+                          onChange={(e) => setCardData({ ...cardData, expiryDate: formatExpiryDate(e.target.value) })}
+                          maxLength={5}
+                          className="bg-[#404040] border-gray-500 text-white placeholder-gray-500 rounded-2xl py-3"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-sm font-medium text-gray-300 mb-2 block">CVV</label>
+                        <Input
+                          placeholder="123"
+                          value={cardData.cvv}
+                          onChange={(e) => setCardData({ ...cardData, cvv: e.target.value.replace(/\D/g, '').slice(0, 3) })}
+                          maxLength={3}
+                          className="bg-[#404040] border-gray-500 text-white placeholder-gray-500 rounded-2xl py-3"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-gray-300 mb-2 block">Billing ZIP Code</label>
+                      <Input
+                        placeholder="90210"
+                        value={cardData.zipCode}
+                        onChange={(e) => setCardData({ ...cardData, zipCode: e.target.value.replace(/\D/g, '').slice(0, 5) })}
+                        maxLength={5}
+                        className="bg-[#404040] border-gray-500 text-white placeholder-gray-500 rounded-2xl py-3"
+                      />
+                    </div>
+
+                    <div className="bg-[#404040] rounded-xl p-3 flex items-center space-x-2">
+                      <Shield className="w-4 h-4 text-[#00FF41]" />
+                      <span className="text-xs text-gray-400">
+                        Your payment information is encrypted and secure
+                      </span>
+                    </div>
+                  </div>
+
+                  <Button
+                    onClick={handleAddPaymentMethod}
+                    disabled={!cardData.name || !cardData.cardNumber || !cardData.expiryDate || !cardData.cvv || !cardData.zipCode}
+                    className="w-full bg-[#00FF41] text-black hover:bg-[#00FF41]/90 font-semibold rounded-2xl py-3 shadow-glow-green transition-all duration-300 disabled:opacity-50"
+                  >
+                    <Lock className="w-4 h-4 mr-2" />
+                    Add Payment Method
+                  </Button>
+                </>
+              )}
+
+              {walletStep === 'processing' && (
+                <>
+                  <div className="text-center space-y-6">
+                    <div className="w-20 h-20 bg-[#00FF41] rounded-full flex items-center justify-center mx-auto animate-pulse">
+                      <CreditCard className="w-10 h-10 text-black" />
+                    </div>
+                    <div>
+                      <h1 className="text-xl font-bold text-white mb-2">Processing Payment Method</h1>
+                      <p className="text-gray-400 text-sm">Securely adding your card...</p>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00FF41]"></div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )
@@ -391,7 +586,6 @@ export function OnboardingFlow({
               <div className="text-center">
                 <p className="text-xs text-gray-500 mb-4">Track your shipment via email confirmation</p>
               </div>
-
               <Button
                 onClick={nextStep}
                 className="w-full bg-[#00FF41] text-black hover:bg-[#00FF41]/90 font-semibold rounded-2xl py-3 shadow-glow-green transition-all duration-300"
@@ -414,6 +608,7 @@ export function OnboardingFlow({
                 </div>
                 <Badge className="bg-[#404040] border-[#00FF41] text-[#00FF41] rounded-xl px-4 py-2 shadow-glow-green">
                   Step 6 of 6
+
                 </Badge>
               </div>
 

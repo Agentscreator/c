@@ -57,6 +57,10 @@ export default function HomePage() {
     setAppState("app")
   }
 
+  const handleOnboardingBack = () => {
+    setAppState("auth")
+  }
+
   const handleSignOut = () => {
     setIsAuthenticated(false)
     localStorage.removeItem("crosspointx-auth")
@@ -93,6 +97,7 @@ export default function HomePage() {
           currentStep={currentStep}
           setCurrentStep={setCurrentStep}
           onComplete={handleOnboardingComplete}
+          onBack={handleOnboardingBack}
         />
       )
     case "app":

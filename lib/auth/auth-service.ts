@@ -10,7 +10,7 @@ export interface RegisterData {
   email: string;
   phone: string;
   password: string;
-  tagCode: string;
+  tagCode?: string; // Made optional
   skillLevel?: string;
   location?: string;
   interests: string[];
@@ -81,10 +81,12 @@ export class AuthService {
   // Register new user
   static async register(data: RegisterData): Promise<AuthResult> {
     try {
-      // Validate tag code first
-      const isValidTag = await this.validateTagCode(data.tagCode);
-      if (!isValidTag) {
-        return { success: false, message: 'Invalid or already used tag code' };
+      // Validate tag code if provided
+      if (data.tagCode) {
+        const isValidTag = await this.validateTagCode(data.tagCode);
+        if (!isValidTag) {
+          return { success: false, message: 'Invalid or already used tag code' };
+        }
       }
 
       // Check if username is available
@@ -110,7 +112,7 @@ export class AuthService {
           email: data.email,
           phone: data.phone,
           passwordHash,
-          tagCode: data.tagCode,
+          tagCode: data.tagCode || null, // Use null if no tagCode provided
           skillLevel: data.skillLevel,
           location: data.location,
           interests: data.interests,
@@ -123,15 +125,17 @@ export class AuthService {
           email: users.email,
         });
 
-      // Mark tag code as used
-      await db
-        .update(tagCodes)
-        .set({ 
-          isUsed: true, 
-          usedBy: newUser.id,
-          usedAt: new Date()
-        })
-        .where(eq(tagCodes.code, data.tagCode));
+      // Mark tag code as used (only if provided)
+      if (data.tagCode) {
+        await db
+          .update(tagCodes)
+          .set({ 
+            isUsed: true, 
+            usedBy: newUser.id,
+            usedAt: new Date()
+          })
+          .where(eq(tagCodes.code, data.tagCode));
+      }
 
       // Create session
       const sessionToken = this.generateSessionToken();
